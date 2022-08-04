@@ -1,13 +1,4 @@
----
-title: "BD vs Controls-DMA"
-author: "Aysheh Alrfooh"
-date: '2022-06-08'
-output:
-  ioslides_presentation:
-    widescreen: true
-    smaller: true
 
----
 
 
 ## BD vs Controls analysis 
