@@ -1,0 +1,379 @@
+---
+title: "BD vs Controls-DMA"
+author: "Aysheh Alrfooh"
+date: '2022-06-08'
+output:
+  ioslides_presentation:
+    widescreen: true
+    smaller: true
+
+---
+
+
+## BD vs Controls analysis 
+In this slides I will show how to run differential methylation analysis (DMA)-bipolar vs controls group using MethylKit package 
+
+## Workflow of the pre-processing steps
+
+- Excluding the samples from run #13 due to the low quality of the run. 
+- Excluding the samples that have less than 93% or NA value for the bisulfite conversion rate.  
+- Summarizing the technical replicates by 
+- Identifying the cytosines that were covered in all samples, with at least have read coverage equal 1 
+- Normalizing the read coverage using the median read coverage as scaling factor
+- Filtering the CpG sites that have less than 10 reads, and CpG sites that have more than 99.9 percentile of coverage in each sample.
+
+## Workflow of the pre-processing steps-continued
+
+- Combine the reads for F and R strands for each CpG site. Now, we have the total methylation for each CpG site.
+- Running PCA to check which principal components are associated with the batch ID.  
+-	Correcting the data by removing the PC1 and PC2
+- Conducting the differential methylation analysis 
+
+## Installing the required pacakges
+
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("methylKit")
+
+ library (methylKit)
+ 
+``` {r include =FALSE}
+
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("methylKit")
+
+library (methylKit)
+library(devtools)
+library(ggplot2)
+library(plyr)
+library(lattice)
+library(viridis)
+library(ggplot2)
+library(dplyr)
+library(hrbrthemes)
+library(data.table)
+library(dplyr)
+library(formattable)
+library(tidyr)
+library(plotly)
+library (Hmisc )
+library (table1)
+library (purrr)
+library(readr)
+library (methylKit)
+library (edmr)
+
+#######Reading methylation calling files###############
+data.xls <- read.csv(file="R:/Aysheh/Gaine Lab/BD-SB/Analysis/Final/FullPathAllSamples.csv", header= TRUE)### it has the paths for the xls files(methylation calls files) 
+data.xls <- data.xls[  data.xls$error== "NO", ]
+file.list.xls <- as.list(as.vector (unlist (data.xls$Full.Path)))
+file.list.txt <- as.list (as.vector (unlist (data.xls$Full.Path.txt)))
+samples_id <- as.vector (unlist (data.xls$sample_id))
+methylation.calls.file.coln <- c (  "chrBase","chr"   , "base", "strand", "coverage", "freqC",  "freqT")
+####################################
+#reading the file that has the list of the interested CpGs 
+CpGs <- read.csv(file= "R:/Aysheh/Gaine Lab/BD-SB/Analysis/CpGs.csv", header = TRUE)# is a list of CpG stites that we are interseted in analyzing 
+CpGs.df <- as.data.frame(CpGs )#conveting the cvs files to data frame 
+seqnames <- as.vector(CpGs.df$chr)
+start <- as.vector(CpGs.df$start)
+end <- as.vector(CpGs.df$end)
+# mut=GRanges(seqnames=seqnames,
+#             ranges=IRanges(start=start,
+#                            end=end))
+CpGs.df$chrBase <- paste(CpGs.df$chr,".", CpGs.df$start, sep="")
+################################
+datalist = list()
+for(i in 1:length (file.list.xls) ) {
+  df <- read.csv( paste(file.list.xls[[i]]), header = TRUE, sep = "")
+  df$chrBase <- gsub(" ", "",paste(df$contig,".", df$position ))
+  df$coverage <- as.numeric (df$reads.ME+ df$reads.UM)
+  df$WC.strand[df$WC.strand== "W"] <- "F"
+  df$WC.strand[df$WC.strand== "C"] <- "R"
+  df.final <- data.frame(df$chrBase,df$contig, df$position, df$WC.strand, df$coverage, df$reads.ME, df$reads.UM )
+  colnames(df.final)<- methylation.calls.file.coln
+  df.final <- distinct(df.final)
+  df.final <- df.final[which (df.final$chrBase%in% CpGs.df$chrBase),]
+  df.final$name <- names(samples_id)[i]
+  rownames (df.final) <- df.final$chrBase
+
+df.final$pm <-(df.final[,6]/df.final[,5])*100
+  names (df.final) [c(5)]<- paste ("coverage")
+  names (df.final) [c(6)]<- paste ("freqC")
+  names (df.final) [c(7)]<- paste ("freqT")
+  names (df.final) [c(8)]<- paste ("PM")
+  df.final <- df.final[order(df.final$base),]
+  datalist[[i]] <-  df.final [, 1:8]}
+
+names (datalist) <- samples_id
+g2 <- map (split (datalist, names (datalist)),bind_cols )
+datalistfinal <- list ()
+for (i in 1:length (g2)) {
+  if (length (colnames(g2[[i]]))== 8){
+    g2df <-  as.data.frame (g2[[i]])
+    g2df <- subset (g2df,select = c( 1:7))#statment 1
+    g2df [c(6)] <- round (g2df[[6]]/g2df[[5]]*100, 2)
+    g2df [c(7)] <- round (100-g2df [c(6)], 2)
+    names (g2df) [c(5)]<- paste ("coverage") #statment 1
+    names (g2df)[c(6)]<- paste ("freqC") #statment 1
+    names (g2df)  [c(7)]<- paste ("freqT") #statment 1
+    # names (g2df)  [c(8)]<- paste ("PM") #statment 1
+    datalistfinal [[paste (names(g2[i]))]] <-  g2df#statment 1
+  } else if (length(colnames(g2[[i]]))== 16) {
+    g2df <-  as.data.frame (g2[[i]])
+    g2df[[5]] <-  g2df[[5]] + g2df[[13]] #statment 2
+    g2df[[6]] <-  g2df[[6]]+ g2df[[14]]#statment 2
+    g2df[[7]] <-  g2df[[7]]+ g2df[[15]]#statment 2
+    g2df[[8]]<- g2df[[6]]/g2df[[5]]*100#statment 2
+    g2df <- subset (g2df,select = c( 1:7))#statment 1
+    g2df [c(6)] <- round (g2df[[6]]/g2df[[5]]*100, 2)
+    g2df [c(7)] <- round (100-g2df [c(6)], 2)
+    names (g2df)  [c(1)]<- paste ("chrBase") #statment 1
+    names (g2df)  [c(2)]<- paste ("chr") #statment 1
+    names (g2df)  [c(3)]<- paste ("base") #statment 1
+    names (g2df)  [c(4)]<- paste ("strand") #statment 1
+    names (g2df)  [c(5)]<- paste ("coverage") #statment 1
+    names (g2df)  [c(6)]<- paste ("freqC") #statment 1
+    names (g2df)  [c(7)]<- paste ("freqT") #statment 1
+    # names (g2df)  [c(8)]<- paste ("PM") #statment 1
+    datalistfinal [[paste (names(g2[i]))]] <-  g2df#statment 1[i]]#statment 2
+
+  }else if (length(colnames(g2[[i]]))== 24) {
+    g2df <-  as.data.frame (g2[[i]])
+    g2df[[5]] <-  g2df[[5]]+ g2df[[13]]+ g2df[[21]]#statment 3
+    g2df[[6]] <-  g2df[[6]]+ g2df[[14]]+ g2df[[22]]#statment 3
+    g2df[[7]] <-  g2df[[7]]+ g2df[[15]]+ g2df[[23]]#statment 3
+    g2df [[8]]<- g2df[[6]]/g2df[[5]]*100#statment 3
+    g2df <- subset (g2df,select = c( 1:7))#statment 3
+    g2df [c(6)] <- round (g2df[[6]]/g2df[[5]]*100, 2)
+    g2df [c(7)] <- round (100-g2df [c(6)], 2)
+    names (g2df)  [c(1)]<- paste ("chrBase") #statment 1
+    names (g2df)  [c(2)]<- paste ("chr") #statment 1
+    names (g2df)  [c(3)]<- paste ("base") #statment 1
+    names (g2df)  [c(4)]<- paste ("strand") #statment 1
+    names (g2df)  [c(5)]<- paste ("coverage") #statment 1
+    names (g2df)  [c(6)]<- paste ("freqC") #statment 1
+    names (g2df)  [c(7)]<- paste ("freqT") #statment 1
+    # names (g2df)  [c(8)]<- paste ("PM") #statment 1
+    datalistfinal [[paste (names(g2[i]))]] <-  g2df#statment 1
+  }else {
+    g2df <-  as.data.frame (g2[[i]])
+    g2df[[5]] <-  g2df[[5]]+ g2df[[13]]+ g2df[[21]]+g2df[[29]]#statment 4
+    g2df[[6]] <-  g2df[[6]]+ g2df[[14]]+ g2df[[22]]+g2df[[30]]#statment 4
+    g2df[[7]] <-  g2df[[7]]+ g2df[[15]]+ g2df[[23]]+g2df[[31]]#statment 4
+    g2df [[8]]<- g2df[[6]]/g2df[[5]]*100#statment 4
+    g2df <- subset (g2df,select = c( 1:7))#statment 4
+    g2df [c(6)] <- round (g2df[[6]]/g2df[[5]]*100, 2)
+    g2df [c(7)] <- round (100-g2df [c(6)], 2)
+    names (g2df)  [c(1)]<- paste ("chrBase") #statment 1
+    names (g2df)  [c(2)]<- paste ("chr") #statment 1
+    names (g2df)  [c(3)]<- paste ("base") #statment 1
+    names (g2df)  [c(4)]<- paste ("strand") #statment 1
+    names (g2df)  [c(5)]<- paste ("coverage") #statment 1
+    names (g2df)  [c(6)]<- paste ("freqC") #statment 1
+    names (g2df)  [c(7)]<- paste ("freqT") #statment 1
+    # names (g2df)  [c(8)]<- paste ("PM") #statment 1
+    datalistfinal[[paste (names(g2[i]))]] <-  g2df#statment 1
+  }}
+lapply(names(datalistfinal), function(x) write_tsv(datalistfinal[[x]], file=paste("R:\\Aysheh\\Gaine Lab\\BD-SB\\Analysis\\Final\\txt_files\\",x,".txt", sep ="")))
+#################Reading metadata#################
+sample_covariates_noduplicates <-read.csv(file="R:/Aysheh/Gaine Lab/BD-SB/Analysis/Final/samples_covariates_noduplicate.csv", header= TRUE)
+metadata <- sample_covariates_noduplicates[, c("id", "sample_id", "Race"    ,  "Sex" ,  "Sexual.Orientation" ,  "Age", "BMI", "Smoking.History",
+                                               "batch_id_final", "number_of_lifetime_suicide" , "history_of_suicide_attempt", "group")]
+
+file.list <-  as.list(as.vector (unlist ( (sample_covariates_noduplicates$file..txt))))
+sample.id <-  as.list(as.vector (unlist (sample_covariates_noduplicates$sample_id)))
+treatment <-  as.vector (unlist (sample_covariates_noduplicates$history_of_suicide_attempt))
+group <- as.vector (unlist (sample_covariates_noduplicates$group))
+metadata$Race <- as.factor (metadata$Race) # setting variable as factor
+metadata$Sex <- as.factor(metadata$Sex)# setting variable as factor
+metadata$Sexual.Orientation <- as.factor(metadata$Sexual.Orientation)# setting variable as factor
+metadata$Age <- as.numeric(metadata$Age)# setting the variable as numeric 
+metadata$BMI <- as.numeric (metadata$BMI)# setting the variable as numeric
+metadata$batch_id <- as.factor (metadata$batch_id)# setting variable as factor
+metadata$number_of_lifetime_suicide <- as.numeric (metadata$number_of_lifetime_suicide)# setting the variable as numeric
+metadata$history_of_suicide_attempt <- as.factor (metadata$history_of_suicide_attempt)# setting variable as factor
+metadata$group <- as.factor(metadata$group)# setting variable as factor
+metadata$batch_id_final <- as.character (metadata$batch_id_final)
+```
+## Descriptive statistics
+```{r echo=FALSE}
+
+sample_covariates_noduplicates <-read.csv(file="R:/Aysheh/Gaine Lab/BD-SB/Analysis/Final/samples_covariates_noduplicate.csv", header= TRUE)
+metadata <- sample_covariates_noduplicates[, c("id", "sample_id", "Race"    ,  "Sex" ,  "Sexual.Orientation" ,  "Age", "BMI", "Smoking.History",
+                                               "batch_id_final", "number_of_lifetime_suicide" , "history_of_suicide_attempt", "group")]
+
+file.list <-  as.list(as.vector (unlist ( (sample_covariates_noduplicates$file.txt))))
+sample.id <-  as.list(as.vector (unlist (sample_covariates_noduplicates$sample_id)))
+treatment <-  as.vector (unlist (sample_covariates_noduplicates$history_of_suicide_attempt))
+group <- as.vector (unlist (sample_covariates_noduplicates$group))
+metadata$Race <- as.factor (metadata$Race) # setting variable as factor
+metadata$Sex <- as.factor(metadata$Sex)# setting variable as factor
+metadata$Sexual.Orientation <- as.factor(metadata$Sexual.Orientation)# setting variable as factor
+metadata$Age <- as.numeric(metadata$Age)# setting the variable as numeric 
+metadata$BMI <- as.numeric (metadata$BMI)# setting the variable as numeric
+metadata$batch_id <- as.factor (metadata$batch_id)# setting variable as factor
+metadata$number_of_lifetime_suicide <- as.numeric (metadata$number_of_lifetime_suicide)# setting the variable as numeric
+metadata$history_of_suicide_attempt <- as.factor (metadata$history_of_suicide_attempt)# setting variable as factor
+metadata$group <- as.factor(metadata$group)# setting variable as factor
+metadata$batch_id_final <- as.character (metadata$batch_id_final)
+metadata$Smoking.History <- as.factor(metadata$Smoking.History)
+Ds <- metadata 
+Ds$Smoking.History <- factor (Ds$Smoking.History)
+Ds$Sex <- factor(Ds$Sex, levels = c (2, 1), labels = c ( "Male", "Female"))
+Ds$history_of_suicide_attempt <- factor (Ds$history_of_suicide_attempt, level = c(0, 1), labels= c("No", "Yes"))
+Ds$group <- factor(Ds$group, levels = c (1, 0), labels = c ("Bipolar Disorder (BD)", "Controls"))
+label(Ds$Race)   <- "Race"
+label (Ds$Sex) <- "Sex"
+label (Ds$Age) <- "Age (years)"
+label (Ds$BMI) <- "BMI"
+label (Ds$history_of_suicide_attempt)<- "History of suicide attempt"
+label (Ds$Smoking.History) <- "Smoking history"
+
+
+
+ table1(~ Ds$Sex + Ds$Age+ Ds$Race +Ds$Smoking.History + Ds$BMI  | Ds$group, data = Ds)
+```
+
+
+## Reading the methylation calls files 
+               
+```{r echo= TRUE, results= "hide",message = FALSE  }
+
+myobjgroup = methRead(file.list,
+               sample.id = sample.id,
+               header = TRUE, 
+               sep = "\t", 
+               assembly="hg38",
+               treatment = group,
+               context="CpG",resolution = "base", 
+               mincov = 0)#reading the files 
+
+```
+## Filtering any CpG sites that have 0 read coverage 
+``` {r echo= TRUE, results = "hide", message = FALSE}
+filtered.nocoverage.myobjgroup=filterByCoverage(myobjgroup,lo.count=1,
+                                           lo.perc=NULL,
+                                           hi.count=NULL,hi.perc=NULL)
+```
+## Normalizing the read coverage 
+
+
+``` {r echo= TRUE, results= "hide" , message = FALSE}
+newObjgroup = normalizeCoverage(filtered.nocoverage.myobjgroup,
+                                method="median")
+```
+
+## Filtering the low read coverage CpG sites 
+
+Filtering the CpG sites that have less than 10 reads, and CpG sites that have more than 99.9 percentile of coverage in each sample.
+
+
+``` {r echo= TRUE, results= "hide" ,message = FALSE }
+filtered.newobjgroup = filterByCoverage(newObjgroup,lo.count=10,
+                                lo.perc=NULL,
+                                 hi.count=NULL,hi.perc=99.9)
+```
+## Combining the reads from the two strands
+
+``` {r echo= TRUE, results="hide" , message = FALSE}
+meth.filteredgroup <- methylKit::unite (filtered.newobjgroup,
+                             destrand=TRUE )
+
+```
+## Running the PCA to detect which PC is associated with the batch ID
+
+``` {r echo= TRUE, message = FALSE}
+
+as.all.samplesgroup=assocComp(mBase=meth.filteredgroup, metadata)# PCA after all filtration to test the association between PC and batch ID variable 
+as.all.samplesgroup$association[, 1:10]
+ write.csv(as.all.samplesgroup$association, "R:/Aysheh/Gaine Lab/BD-SB/Analysis/Final/associationbetweenPCandcovariates.csv")
+
+
+```
+## Removing the PC 1 and PC2 to account for the batch effect 
+
+``` {r echo= TRUE, message = FALSE}
+new.meth.filterdgroup = removeComp(meth.filteredgroup,comp=c (1, 2))
+as.filtered <-assocComp(mBase=new.meth.filterdgroup, metadata)
+write.csv(as.all.samplesgroup$association, "R:/Aysheh/Gaine Lab/BD-SB/Analysis/Final/associationbetweenPCandcovariates-afterbatcheffectcorrection.csv")
+methylationall <- percMethylation (new.meth.filterdgroup)
+rownames (methylationall) <- paste(getData(new.meth.filterdgroup)[, 1], ".", getData(new.meth.filterdgroup)[,2], sep ="")
+write.csv (methylationall, "R:/Aysheh/Gaine Lab/BD-SB/Analysis/Final/BDvsCO/total-methylation-allsamples.csv")
+```
+
+## DMA at the level of one CpG sites
+
+``` {r echo= TRUE, message = FALSE}
+covariates0 <-  metadata[, c("Race", "Sex", "Age", "BMI",  "Smoking.History")]
+
+
+
+my.diffMeth0 <-calculateDiffMeth(new.meth.filterdgroup,
+                               covariates=covariates0,
+                               overdispersion="MN",test="Chisq",mc.cores=1)
+
+write.csv(my.diffMeth0,"R:/Aysheh/Gaine Lab/BD-SB/Analysis/Final/BDvsCO/DMA-BDvscon.csv" )
+
+```
+
+## DMA at the level of once CpG sites-Hypermetylated CpG sites
+
+Hypermethylated CpG sites
+
+``` {r echo= TRUE, message = FALSE }
+myDiff25p0.hyper=getMethylDiff(my.diffMeth0,difference=0,
+                              qvalue=0.05,type="hyper")
+
+myDiff25p0.hyper
+```
+
+## DMA at the level of one CpG sites-Hypomethylated CpG sites
+
+Hypomethylated CpG sites
+
+``` {r echo= TRUE, message = FALSE }
+myDiff25p0.hypo = getMethylDiff(my.diffMeth0,difference=0,
+                             qvalue=0.05,type="hypo")
+
+
+myDiff25p0.hypo
+
+```
+
+## DMA at the level of one CpG site-Signficant differentially methyalted CpG 
+``` {r echo= TRUE, message = FALSE }
+
+myDiff25p0 =getMethylDiff(my.diffMeth0,difference=0,qvalue=0.05)
+
+myDiff25p0
+
+```
+## visualize the distribution of hypo/hyper-methylated bases per chromosome
+
+``` {r echo= TRUE, message = FALSE}
+bedgraph(myDiff25p0, col.name = "meth.diff", file.name = "diff_cpg_25p.bed")
+```
+## DMA at the level of region
+
+``` {r echo= TRUE, message = FALSE }
+
+tiles = tileMethylCounts(new.meth.filterdgroup,win.size=300,step.size=300,cov.bases = 2)
+head (tiles)
+```
+
+## DMA at the level of region
+
+``` {r echo= TRUE, message = FALSE }
+mydiffdmr0 <- calculateDiffMeth(tiles,
+                               covariates=covariates0,
+                               overdispersion="MN",test="Chisq",mc.cores=1)
+head (mydiffdmr0)
+
+bedgraph(myDiff25p0, col.name = "meth.diff", file.name = "diff_cpg_25p.bed")
+
+write.csv(mydiffdmr0,"R:/Aysheh/Gaine Lab/BD-SB/Analysis/Final/BDvsCO/DMA-BDvscon-DMR.csv" )
+
+```
