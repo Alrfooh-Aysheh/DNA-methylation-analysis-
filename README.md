@@ -15,10 +15,10 @@ Running differential methylation analysis (DMA)-bipolar vs controls group using 
 
 ## Workflow of the pre-processing steps-continued
 
-- Combine the reads for F and R strands for each CpG site. Now, we have the total methylation for each CpG site.
-- Running PCA to check which principal components are associated with the batch ID.  
--	Correcting the data by removing the PC1 and PC2
-- Conducting the differential methylation analysis 
+- Combining the reads for F and R strands for each CpG site. Now, we have the total methylation for each CpG site.
+- Running PCA to check which principal components are associated with the batch ID variable.  
+-Correcting the data by removing the PCs that are significantly associated with batch ID variable. 
+
 
 ## Installing the required pacakges
 
@@ -83,18 +83,14 @@ as.all.samplesgroup$association[, 1:10]
 ``` {r echo= TRUE, message = FALSE}
 new.meth.filterdgroup = removeComp(meth.filteredgroup,comp=c (1, 2))
 as.filtered <-assocComp(mBase=new.meth.filterdgroup, metadata)
-write.csv(as.all.samplesgroup$association, "R:/Aysheh/Gaine Lab/BD-SB/Analysis/Final/associationbetweenPCandcovariates-afterbatcheffectcorrection.csv")
-methylationall <- percMethylation (new.meth.filterdgroup)
-rownames (methylationall) <- paste(getData(new.meth.filterdgroup)[, 1], ".", getData(new.meth.filterdgroup)[,2], sep ="")
-write.csv (methylationall, "R:/Aysheh/Gaine Lab/BD-SB/Analysis/Final/BDvsCO/total-methylation-allsamples.csv")
 ```
 
 ## DMA at the level of one CpG sites
 
 ``` {r echo= TRUE, message = FALSE}
-covariates0 <-  metadata[, c("Race", "Sex", "Age", "BMI",  "Smoking.History")]
-my.diffMeth0 <-calculateDiffMeth(new.meth.filterdgroup,
-                               covariates=covariates0,
+covariates <-  metadata[, c("Race", "Sex", "Age", "BMI",  "Smoking.History")]
+my.diffMeth <-calculateDiffMeth(new.meth.filterdgroup,
+                               covariates=covariates,
                                overdispersion="MN",test="Chisq",mc.cores=1)
 write.csv(my.diffMeth0,"R:/Aysheh/Gaine Lab/BD-SB/Analysis/Final/BDvsCO/DMA-BDvscon.csv" )
 ```
@@ -104,9 +100,9 @@ write.csv(my.diffMeth0,"R:/Aysheh/Gaine Lab/BD-SB/Analysis/Final/BDvsCO/DMA-BDvs
 Hypermethylated CpG sites
 
 ``` {r echo= TRUE, message = FALSE }
-myDiff25p0.hyper=getMethylDiff(my.diffMeth0,difference=0,
+myDiff25p.hyper=getMethylDiff(my.diffMeth,difference=0,
                               qvalue=0.05,type="hyper")
-myDiff25p0.hyper
+myDiff25p.hyper
 ```
 
 ## DMA at the level of one CpG sites-Hypomethylated CpG sites
@@ -114,15 +110,15 @@ myDiff25p0.hyper
 Hypomethylated CpG sites
 
 ``` {r echo= TRUE, message = FALSE }
-myDiff25p0.hypo = getMethylDiff(my.diffMeth0,difference=0,
+myDiff25p.hypo = getMethylDiff(my.diffMeth,difference=0,
                              qvalue=0.05,type="hypo")
-myDiff25p0.hypo
+myDiff25p.hypo
 ```
 
 ## DMA at the level of one CpG site-Signficant differentially methyalted CpG 
 ``` {r echo= TRUE, message = FALSE }
-myDiff25p0 =getMethylDiff(my.diffMeth0,difference=0,qvalue=0.05)
-myDiff25p0
+myDiff25p =getMethylDiff(my.diffMeth,difference=0,qvalue=0.05)
+myDiff25p
 ```
 ## visualize the distribution of hypo/hyper-methylated bases per chromosome
 
@@ -139,10 +135,10 @@ head (tiles)
 ## DMA at the level of region
 
 ``` {r echo= TRUE, message = FALSE }
-mydiffdmr0 <- calculateDiffMeth(tiles,
-                               covariates=covariates0,
+mydiffdmr <- calculateDiffMeth(tiles,
+                               covariates=covariates,
                                overdispersion="MN",test="Chisq",mc.cores=1)
-head (mydiffdmr0)
-bedgraph(myDiff25p0, col.name = "meth.diff", file.name = "diff_cpg_25p.bed")
-write.csv(mydiffdmr0,"R:/Aysheh/Gaine Lab/BD-SB/Analysis/Final/BDvsCO/DMA-BDvscon-DMR.csv" )
+head (mydiffdmr)
+bedgraph(myDiff25p, col.name = "meth.diff", file.name = "diff_cpg_25p.bed")
+
 ```
