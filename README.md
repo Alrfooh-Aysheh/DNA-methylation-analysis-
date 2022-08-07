@@ -1,7 +1,7 @@
 
 
 
-## BD vs Controls analysis 
+## Differential methylation analysis (DMA)-bipolar disorder group vs controls group 
 Running differential methylation analysis (DMA)-bipolar vs controls group using MethylKit package 
 
 ## Workflow of the pre-processing steps
@@ -17,7 +17,7 @@ Running differential methylation analysis (DMA)-bipolar vs controls group using 
 
 - Combining the reads for F and R strands for each CpG site. Now, we have the total methylation for each CpG site.
 - Running PCA to check which principal components are associated with the batch ID variable.  
--Correcting the data by removing the PCs that are significantly associated with batch ID variable. 
+- Correcting the data by removing the PCs that are significantly associated with batch ID variable. 
 
 
 ## Installing the required pacakges
