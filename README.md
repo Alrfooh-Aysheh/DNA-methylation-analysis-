@@ -76,7 +76,6 @@ meth.filteredgroup <- methylKit::unite (filtered.newobjgroup,
 ``` {r echo= TRUE, message = FALSE}
 as.all.samplesgroup=assocComp(mBase=meth.filteredgroup, metadata)# PCA after all filtration to test the association between PC and batch ID variable 
 as.all.samplesgroup$association[, 1:10]
- write.csv(as.all.samplesgroup$association, "R:/Aysheh/Gaine Lab/BD-SB/Analysis/Final/associationbetweenPCandcovariates.csv")
 ```
 ## Removing the PC 1 and PC2 to account for the batch effect 
 
@@ -92,7 +91,6 @@ covariates <-  metadata[, c("Race", "Sex", "Age", "BMI",  "Smoking.History")]
 my.diffMeth <-calculateDiffMeth(new.meth.filterdgroup,
                                covariates=covariates,
                                overdispersion="MN",test="Chisq",mc.cores=1)
-write.csv(my.diffMeth0,"R:/Aysheh/Gaine Lab/BD-SB/Analysis/Final/BDvsCO/DMA-BDvscon.csv" )
 ```
 
 ## DMA at the level of once CpG sites-Hypermetylated CpG sites
