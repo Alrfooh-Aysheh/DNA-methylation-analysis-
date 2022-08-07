@@ -2,13 +2,13 @@
 
 
 ## BD vs Controls analysis 
-In this slides I will show how to run differential methylation analysis (DMA)-bipolar vs controls group using MethylKit package 
+Running differential methylation analysis (DMA)-bipolar vs controls group using MethylKit package 
 
 ## Workflow of the pre-processing steps
 
 - Excluding the samples from run #13 due to the low quality of the run. 
 - Excluding the samples that have less than 93% or NA value for the bisulfite conversion rate.  
-- Summarizing the technical replicates by 
+- Summarizing the technical replicates
 - Identifying the cytosines that were covered in all samples, with at least have read coverage equal 1 
 - Normalizing the read coverage using the median read coverage as scaling factor
 - Filtering the CpG sites that have less than 10 reads, and CpG sites that have more than 99.9 percentile of coverage in each sample.
