@@ -21,13 +21,14 @@ Running differential methylation analysis (DMA)-bipolar vs controls group using 
 
 
 ## Installing the required pacakges
-
+```{r echo= TRUE, results= "hide",message = FALSE  }
 if (!require("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
 
 BiocManager::install("methylKit")
 
  library (methylKit)
+ ```
  
 ## Reading the methylation calls files 
                
